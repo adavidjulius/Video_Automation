@@ -24,7 +24,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.10'
+        python-version: '3.13.5'
         cache: 'pip'  # Cache dependencies for speed
     
     - name: Install dependencies (all free!)
@@ -64,7 +64,7 @@ jobs:
         python upload_youtube.py "${{ steps.topic.outputs.selected_topic }}"
     
     - name: Upload video as artifact (free storage)
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: generated-video
         path: ./*.mp4
