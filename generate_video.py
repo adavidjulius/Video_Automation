@@ -201,6 +201,25 @@ class FreeLocalVideoGenerator:
                 pass
         
         return output_path
+        # Add these enhancements (still free!)
+def add_background_music(self):
+    """Generate synthetic music"""
+    import numpy as np
+    duration = 15
+    sample_rate = 44100
+    t = np.linspace(0, duration, int(sample_rate * duration))
+    
+    # Create simple melody
+    frequencies = [440, 554, 659, 880]  # A, C#, E, A
+    music = np.zeros_like(t)
+    
+    for i, freq in enumerate(frequencies):
+        segment_start = i * len(t) // len(frequencies)
+        segment_end = (i + 1) * len(t) // len(frequencies)
+        music[segment_start:segment_end] = 0.1 * np.sin(2 * np.pi * freq * t[segment_start:segment_end])
+    
+    return AudioClip(lambda t: music[int(t * sample_rate) % len(music)], 
+                    duration=duration, fps=sample_rate)
 
 # Run it!
 if __name__ == "__main__":
