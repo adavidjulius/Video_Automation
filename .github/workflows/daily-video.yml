@@ -1,0 +1,76 @@
+# .github/workflows/daily-video.yml
+name: Daily Free Video Generator
+
+on:
+  schedule:
+    # Run at random times to look natural
+    - cron: '0 8,14,20 * * *'  # 8am, 2pm, 8pm daily
+  workflow_dispatch:  # Manual trigger
+    inputs:
+      topic:
+        description: 'Video topic'
+        required: false
+        default: 'random'
+
+jobs:
+  create-and-post:
+    runs-on: ubuntu-latest  # Free GitHub runner
+    timeout-minutes: 30  # Prevent runaway jobs
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        cache: 'pip'  # Cache dependencies for speed
+    
+    - name: Install dependencies (all free!)
+      run: |
+        python -m pip install --upgrade pip
+        pip install moviepy pillow numpy  # No paid APIs needed!
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg  # Free video processing
+    
+    - name: Generate video topic (if random)
+      id: topic
+      run: |
+        if [[ "${{ github.event.inputs.topic }}" == "random" ]] || [[ -z "${{ github.event.inputs.topic }}" ]]; then
+          TOPICS=("Python Tips" "AI News" "Tech Facts" "Coding Motivation" "Dev Life" "GitHub Hacks")
+          RANDOM=$$$(date +%s)
+          SELECTED_TOPIC=${TOPICS[$RANDOM % ${#TOPICS[@]}]}
+          echo "selected_topic=$SELECTED_TOPIC" >> $GITHUB_OUTPUT
+        else
+          echo "selected_topic=${{ github.event.inputs.topic }}" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Create video (completely local)
+      run: |
+        python generate_video.py "${{ steps.topic.outputs.selected_topic }}"
+    
+    - name: List generated files
+      run: |
+        ls -lah *.mp4
+        echo "Video size: $(du -h *.mp4 | cut -f1)"
+    
+    - name: Upload to YouTube (using free browser automation)
+      env:
+        YOUTUBE_EMAIL: ${{ secrets.YOUTUBE_EMAIL }}
+        YOUTUBE_PASS: ${{ secrets.YOUTUBE_PASS }}
+      run: |
+        pip install selenium webdriver-manager
+        python upload_youtube.py "${{ steps.topic.outputs.selected_topic }}"
+    
+    - name: Upload video as artifact (free storage)
+      uses: actions/upload-artifact@v3
+      with:
+        name: generated-video
+        path: ./*.mp4
+        retention-days: 7  # Free for 90 days
+    
+    - name: Keep runner alive (avoid timeout)
+      run: |
+        echo "✅ Video generation complete!"
+        date
