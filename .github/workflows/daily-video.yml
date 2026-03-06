@@ -1,11 +1,10 @@
-# .github/workflows/daily-video.yml
-name: Daily Free Video Generator
+name: AI Video Bot
 
 on:
   schedule:
-    # Run at random times to look natural
-    - cron: '0 8,14,20 * * *'  # 8am, 2pm, 8pm daily
-  workflow_dispatch:  # Manual trigger
+    # Runs daily at 9 AM UTC (change as needed)
+    - cron: '0 9 * * *'
+  workflow_dispatch:        # Allows manual trigger
     inputs:
       topic:
         description: 'Video topic'
@@ -13,64 +12,53 @@ on:
         default: 'random'
 
 jobs:
-  create-and-post:
-    runs-on: ubuntu-latest  # Free GitHub runner
-    timeout-minutes: 30  # Prevent runaway jobs
-    
+  generate-and-post:
+    runs-on: ubuntu-latest
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.13.5'
-        cache: 'pip'  # Cache dependencies for speed
-    
-    - name: Install dependencies (all free!)
-      run: |
-        python -m pip install --upgrade pip
-        pip install moviepy pillow numpy  # No paid APIs needed!
-        sudo apt-get update
-        sudo apt-get install -y ffmpeg  # Free video processing
-    
-    - name: Generate video topic (if random)
-      id: topic
-      run: |
-        if [[ "${{ github.event.inputs.topic }}" == "random" ]] || [[ -z "${{ github.event.inputs.topic }}" ]]; then
-          TOPICS=("Python Tips" "AI News" "Tech Facts" "Coding Motivation" "Dev Life" "GitHub Hacks")
-          RANDOM=$$$(date +%s)
-          SELECTED_TOPIC=${TOPICS[$RANDOM % ${#TOPICS[@]}]}
-          echo "selected_topic=$SELECTED_TOPIC" >> $GITHUB_OUTPUT
-        else
-          echo "selected_topic=${{ github.event.inputs.topic }}" >> $GITHUB_OUTPUT
-        fi
-    
-    - name: Create video (completely local)
-      run: |
-        python generate_video.py "${{ steps.topic.outputs.selected_topic }}"
-    
-    - name: List generated files
-      run: |
-        ls -lah *.mp4
-        echo "Video size: $(du -h *.mp4 | cut -f1)"
-    
-    - name: Upload to YouTube (using free browser automation)
-      env:
-        YOUTUBE_EMAIL: ${{ secrets.YOUTUBE_EMAIL }}
-        YOUTUBE_PASS: ${{ secrets.YOUTUBE_PASS }}
-      run: |
-        pip install selenium webdriver-manager
-        python upload_youtube.py "${{ steps.topic.outputs.selected_topic }}"
-    
-    - name: Upload video as artifact (free storage)
-      uses: actions/upload-artifact@v4
-      with:
-        name: generated-video
-        path: ./*.mp4
-        retention-days: 7  # Free for 90 days
-    
-    - name: Keep runner alive (avoid timeout)
-      run: |
-        echo "✅ Video generation complete!"
-        date
+      - name: Checkout repository
+        uses: actions/checkout@v4          # Updated to v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5      # Updated to v5
+        with:
+          python-version: '3.13.5'
+          cache: 'pip'                      # Speeds up dependency install
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg    # Required for video processing
+
+      - name: Install Python packages
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Determine video topic
+        id: topic
+        run: |
+          if [[ "${{ github.event.inputs.topic }}" == "random" ]] || [[ -z "${{ github.event.inputs.topic }}" ]]; then
+            TOPICS=("Python Tips" "AI News" "Tech Facts" "Coding Motivation" "GitHub Actions" "Open Source")
+            RANDOM=$$(date +%s)
+            SELECTED=${TOPICS[$RANDOM % ${#TOPICS[@]}]}
+            echo "selected_topic=$SELECTED" >> $GITHUB_OUTPUT
+          else
+            echo "selected_topic=${{ github.event.inputs.topic }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate video
+        run: python scripts/generate_video.py "${{ steps.topic.outputs.selected_topic }}"
+
+      - name: Upload video as artifact (v4)
+        uses: actions/upload-artifact@v4     # ✅ FIXED: v4 is the current version
+        with:
+          name: generated-video
+          path: ./*.mp4
+          retention-days: 7                   # Free for 90 days max
+
+      - name: Upload to YouTube (optional)
+        if: success() && env.YOUTUBE_EMAIL && env.YOUTUBE_PASS
+        env:
+          YOUTUBE_EMAIL: ${{ secrets.YOUTUBE_EMAIL }}
+          YOUTUBE_PASS: ${{ secrets.YOUTUBE_PASS }}
+        run: python scripts/upload_to_youtube.py "${{ steps.topic.outputs.selected_topic }}"
